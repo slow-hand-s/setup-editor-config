@@ -15,6 +15,7 @@
 #   frontend/.editorconfig
 #   frontend/.prettierrc.js
 #   frontend/.prettierignore
+#   frontend/tsconfig.json
 # =============================================================================
 
 set -e  # エラーが発生したら即終了
@@ -167,16 +168,87 @@ dotnet_style_qualification_for_property = false:warning
 dotnet_style_qualification_for_method = false:warning
 dotnet_style_qualification_for_event = false:warning
 
-# --- 命名規則：プライベートフィールドは _camelCase ---------------------------
+# =============================================================================
+# 命名規則
+# =============================================================================
+
+# --- クラス・構造体・enum・デリゲート → PascalCase --------------------------
+dotnet_naming_rule.types.symbols = types
+dotnet_naming_rule.types.style = pascal_case
+dotnet_naming_rule.types.severity = error
+
+dotnet_naming_symbols.types.applicable_kinds = class,struct,enum,delegate
+
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+
+# --- インターフェース → IPascalCase ------------------------------------------
+dotnet_naming_rule.interfaces.symbols = interfaces
+dotnet_naming_rule.interfaces.style = i_prefix
+dotnet_naming_rule.interfaces.severity = error
+
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+
+dotnet_naming_style.i_prefix.capitalization = pascal_case
+dotnet_naming_style.i_prefix.required_prefix = I
+
+# --- 型パラメータ → TPascalCase ----------------------------------------------
+dotnet_naming_rule.type_parameters.symbols = type_parameters
+dotnet_naming_rule.type_parameters.style = t_prefix
+dotnet_naming_rule.type_parameters.severity = error
+
+dotnet_naming_symbols.type_parameters.applicable_kinds = type_parameter
+
+dotnet_naming_style.t_prefix.capitalization = pascal_case
+dotnet_naming_style.t_prefix.required_prefix = T
+
+# --- public メソッド・プロパティ・イベント → PascalCase ----------------------
+dotnet_naming_rule.public_members.symbols = public_members
+dotnet_naming_rule.public_members.style = pascal_case
+dotnet_naming_rule.public_members.severity = error
+
+dotnet_naming_symbols.public_members.applicable_kinds = method,property,event
+dotnet_naming_symbols.public_members.applicable_accessibilities = public,internal,protected,protected_internal
+
+# --- const → PascalCase（ALL_CAPS は C# 標準ではない）-----------------------
+dotnet_naming_rule.constants.symbols = constants
+dotnet_naming_rule.constants.style = pascal_case
+dotnet_naming_rule.constants.severity = error
+
+dotnet_naming_symbols.constants.applicable_kinds = field
+dotnet_naming_symbols.constants.required_modifiers = const
+
+# --- private フィールド → _camelCase -----------------------------------------
 dotnet_naming_rule.private_fields.symbols = private_fields
 dotnet_naming_rule.private_fields.style = underscore_camel
-dotnet_naming_rule.private_fields.severity = warning
+dotnet_naming_rule.private_fields.severity = error
 
 dotnet_naming_symbols.private_fields.applicable_kinds = field
 dotnet_naming_symbols.private_fields.applicable_accessibilities = private
 
 dotnet_naming_style.underscore_camel.capitalization = camel_case
 dotnet_naming_style.underscore_camel.required_prefix = _
+
+# --- static readonly フィールド（public） → PascalCase -----------------------
+dotnet_naming_rule.static_readonly.symbols = static_readonly
+dotnet_naming_rule.static_readonly.style = pascal_case
+dotnet_naming_rule.static_readonly.severity = error
+
+dotnet_naming_symbols.static_readonly.applicable_kinds = field
+dotnet_naming_symbols.static_readonly.applicable_accessibilities = public,internal
+dotnet_naming_symbols.static_readonly.required_modifiers = static,readonly
+
+# --- パラメータ・ローカル変数 → camelCase ------------------------------------
+dotnet_naming_rule.locals_and_params.symbols = locals_and_params
+dotnet_naming_rule.locals_and_params.style = camel_case
+dotnet_naming_rule.locals_and_params.severity = warning
+
+dotnet_naming_symbols.locals_and_params.applicable_kinds = parameter,local
+
+dotnet_naming_style.camel_case.capitalization = camel_case
+
+# --- 非同期メソッド → Async サフィックス（EditorConfig では suffix 未対応）
+# ※ Async サフィックスの強制は StyleCop.Analyzers (SA1302) または
+#    SonarAnalyzer を使用すること
 
 # -----------------------------------------------------------------------------
 # JSON / YAML（appsettings.json 等）
@@ -325,6 +397,259 @@ public/
 EOF
 
 # -----------------------------------------------------------------------------
+# frontend/tsconfig.json
+# -----------------------------------------------------------------------------
+echo "作成: frontend/tsconfig.json"
+cat > frontend/tsconfig.json << 'EOF'
+{
+  "compilerOptions": {
+    // =========================================================================
+    // ターゲット・モジュール
+    // =========================================================================
+
+    // モダンブラウザ向け（Vite がトランスパイルするため最新で問題なし）
+    "target": "ES2022",
+
+    // ESModules（Vite 前提）
+    "module": "ESNext",
+
+    // モジュール解決は bundler モード（Vite / webpack 向け）
+    "moduleResolution": "bundler",
+
+    // =========================================================================
+    // 厳格モード（全て有効化推奨）
+    // =========================================================================
+
+    // strict: true は以下をまとめて有効化する
+    //   - strictNullChecks   : null/undefined の型安全
+    //   - noImplicitAny      : 暗黙的 any の禁止
+    //   - strictFunctionTypes: 関数型の厳格チェック
+    //   - strictBindCallApply: bind/call/apply の型チェック
+    //   - strictPropertyInitialization: クラスプロパティの初期化チェック
+    //   - noImplicitThis     : this の型チェック
+    //   - alwaysStrict       : 全ファイルに "use strict" を付与
+    "strict": true,
+
+    // 未使用ローカル変数をエラーにする（コードの整理を強制）
+    "noUnusedLocals": true,
+
+    // 未使用パラメータをエラーにする
+    "noUnusedParameters": true,
+
+    // switch の fall-through をエラーにする（break 忘れ防止）
+    "noFallthroughCasesInSwitch": true,
+
+    // 型のみの import は type import を強制（バンドルサイズ最適化）
+    "verbatimModuleSyntax": true,
+
+    // =========================================================================
+    // パス・エイリアス
+    // =========================================================================
+
+    // @/ で src/ を参照できるようにする（vite.config.ts の resolve.alias と合わせること）
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+
+    // =========================================================================
+    // JSX
+    // =========================================================================
+
+    // React 17+ の新しい JSX 変換（import React が不要になる）
+    "jsx": "react-jsx",
+
+    // =========================================================================
+    // ライブラリ
+    // =========================================================================
+
+    // DOM API と ESNext の型定義を使用
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+
+    // =========================================================================
+    // その他
+    // =========================================================================
+
+    // デフォルトエクスポートのない CommonJS モジュールを interop する
+    "esModuleInterop": true,
+
+    // ファイル名の大文字小文字を厳密にチェック（Linux/Windows の差異を防ぐ）
+    "forceConsistentCasingInFileNames": true,
+
+    // 型チェックのみ実行（トランスパイルは Vite に任せる）
+    "noEmit": true,
+
+    // インクリメンタルビルドのキャッシュ
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo"
+  },
+
+  "include": [
+    "src/**/*",
+    "vite.config.ts"
+  ],
+
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}
+EOF
+
+# -----------------------------------------------------------------------------
+# frontend/eslint.config.js
+# -----------------------------------------------------------------------------
+echo "作成: frontend/eslint.config.js"
+cat > frontend/eslint.config.js << 'EOF'
+// =============================================================================
+// eslint.config.js
+// TypeScript + React 向け ESLint Flat Config
+// 命名規則は @typescript-eslint/naming-convention で一元管理する
+// =============================================================================
+
+import js from '@eslint/js';
+import tseslint from 'typescript-eslint';
+import reactHooks from 'eslint-plugin-react-hooks';
+import reactRefresh from 'eslint-plugin-react-refresh';
+
+export default tseslint.config(
+  // ---------------------------------------------------------------------------
+  // 対象外ディレクトリ
+  // ---------------------------------------------------------------------------
+  { ignores: ['dist', 'node_modules'] },
+
+  // ---------------------------------------------------------------------------
+  // JS 推奨ルール
+  // ---------------------------------------------------------------------------
+  js.configs.recommended,
+
+  // ---------------------------------------------------------------------------
+  // TypeScript 推奨ルール（型チェックあり）
+  // ---------------------------------------------------------------------------
+  ...tseslint.configs.recommendedTypeChecked,
+  {
+    languageOptions: {
+      parserOptions: {
+        project: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // React 向けルール
+  // ---------------------------------------------------------------------------
+  {
+    plugins: {
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
+    },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      // Fast Refresh の対象外コンポーネントを警告（エラーにしない）
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // 命名規則 + プロジェクト共通ルール
+  // ---------------------------------------------------------------------------
+  {
+    rules: {
+      // -----------------------------------------------------------------------
+      // 命名規則（@typescript-eslint/naming-convention）
+      // -----------------------------------------------------------------------
+      '@typescript-eslint/naming-convention': [
+        'error',
+
+        // デフォルト: camelCase（最も広いセレクタ → 他のルールで上書き可能）
+        {
+          selector: 'default',
+          format: ['camelCase'],
+          leadingUnderscore: 'allow', // 未使用パラメータの _ プレフィックスを許容
+        },
+
+        // 変数: camelCase または UPPER_CASE（定数）
+        // React コンポーネントは PascalCase も許容
+        {
+          selector: 'variable',
+          format: ['camelCase', 'PascalCase', 'UPPER_CASE'],
+        },
+
+        // 関数: camelCase（通常関数）または PascalCase（React コンポーネント）
+        {
+          selector: 'function',
+          format: ['camelCase', 'PascalCase'],
+        },
+
+        // boolean 変数: is / has / should プレフィックスを強制
+        {
+          selector: 'variable',
+          types: ['boolean'],
+          format: ['PascalCase'],
+          prefix: ['is', 'has', 'should', 'can', 'will'],
+        },
+
+        // クラス・型エイリアス・enum → PascalCase
+        {
+          selector: 'typeLike',
+          format: ['PascalCase'],
+        },
+
+        // インターフェース → PascalCase（I プレフィックスは不要: TS 標準）
+        {
+          selector: 'interface',
+          format: ['PascalCase'],
+          // I プレフィックスを付けたい場合は以下のコメントを外す
+          // prefix: ['I'],
+        },
+
+        // 型パラメータ → T プレフィックス必須（例: TItem, TResponse）
+        {
+          selector: 'typeParameter',
+          format: ['PascalCase'],
+          prefix: ['T'],
+        },
+
+        // enum メンバ → PascalCase
+        {
+          selector: 'enumMember',
+          format: ['PascalCase'],
+        },
+
+        // オブジェクトのプロパティ: camelCase（API レスポンスは除外したい場合は requires-type-checking で対応）
+        {
+          selector: 'objectLiteralProperty',
+          format: ['camelCase', 'PascalCase', 'UPPER_CASE'],
+          // snake_case の API レスポンスを扱う場合はコメントを外す
+          // filter: { regex: '^[a-z_]+$', match: false },
+        },
+      ],
+
+      // -----------------------------------------------------------------------
+      // TypeScript 一般ルール
+      // -----------------------------------------------------------------------
+
+      // any を明示的に使う場合は警告（完全禁止より現実的）
+      '@typescript-eslint/no-explicit-any': 'warn',
+
+      // 未使用変数はエラー（_ プレフィックスは除外）
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+
+      // 浮動 Promise（await なし・then なし）を禁止
+      '@typescript-eslint/no-floating-promises': 'error',
+
+      // async 関数で常に Promise を返すことを強制（不要な async を防ぐ）
+      '@typescript-eslint/require-await': 'error',
+    },
+  },
+);
+EOF
+
+# -----------------------------------------------------------------------------
 # 完了メッセージ
 # -----------------------------------------------------------------------------
 echo ""
@@ -338,12 +663,20 @@ echo "  backend/.editorconfig"
 echo "  frontend/.editorconfig"
 echo "  frontend/.prettierrc.js"
 echo "  frontend/.prettierignore"
+echo "  frontend/tsconfig.json"
+echo "  frontend/eslint.config.js"
 echo ""
 echo "次のステップ:"
 echo "  1. VS Code 拡張機能をインストール"
 echo "     code --install-extension EditorConfig.EditorConfig"
 echo "     code --install-extension esbenp.prettier-vscode"
+echo "     code --install-extension dbaeumer.vscode-eslint"
 echo ""
 echo "  2. frontend の依存パッケージをインストール"
 echo "     cd frontend"
 echo "     pnpm add -D prettier @trivago/prettier-plugin-sort-imports"
+echo "     pnpm add -D eslint typescript-eslint @eslint/js"
+echo "     pnpm add -D eslint-plugin-react-hooks eslint-plugin-react-refresh"
+echo ""
+echo "  3. @/ エイリアスを vite.config.ts にも追加すること"
+echo "     resolve: { alias: { '@': path.resolve(__dirname, 'src') } }"
