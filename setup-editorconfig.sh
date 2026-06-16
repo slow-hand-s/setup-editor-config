@@ -650,6 +650,163 @@ export default tseslint.config(
 EOF
 
 # -----------------------------------------------------------------------------
+# SETUP.md
+# -----------------------------------------------------------------------------
+echo "作成: SETUP.md"
+cat > SETUP.md << 'EOF'
+# セットアップ手順
+
+このファイルは `setup-editorconfig.sh` を実行後に必要な手順をまとめたものです。
+
+---
+
+## 1. VS Code 拡張機能
+
+```bash
+code --install-extension EditorConfig.EditorConfig
+code --install-extension esbenp.prettier-vscode
+code --install-extension dbaeumer.vscode-eslint
+code --install-extension ms-dotnettools.csharp
+```
+
+| 拡張機能 | 用途 |
+|----------|------|
+| EditorConfig.EditorConfig | `.editorconfig` を読んでエディタ設定を自動適用 |
+| esbenp.prettier-vscode | frontend の保存時フォーマット（Prettier） |
+| dbaeumer.vscode-eslint | ESLint エラー・警告をエディタ上に表示 |
+| ms-dotnettools.csharp | C# の保存時フォーマット・IntelliSense |
+
+---
+
+## 2. frontend パッケージ
+
+```bash
+cd frontend
+pnpm add -D \
+  prettier \
+  @trivago/prettier-plugin-sort-imports \
+  eslint \
+  typescript-eslint \
+  @eslint/js \
+  eslint-plugin-react-hooks \
+  eslint-plugin-react-refresh
+```
+
+| パッケージ | 用途 |
+|------------|------|
+| prettier | コードフォーマッター本体 |
+| @trivago/prettier-plugin-sort-imports | import 順序の自動整列 |
+| eslint | 静的解析ツール本体 |
+| typescript-eslint | TypeScript 向け ESLint ルールセット |
+| @eslint/js | ESLint 公式 JS 推奨ルール |
+| eslint-plugin-react-hooks | React Hooks のルール強制 |
+| eslint-plugin-react-refresh | Vite Fast Refresh の警告 |
+
+---
+
+## 3. backend パッケージ（NuGet）
+
+`.csproj` に追加して `dotnet restore` を実行します。
+
+```xml
+<ItemGroup>
+  <!-- 静的解析 -->
+  <PackageReference Include="SonarAnalyzer.CSharp" Version="10.9.0.115408">
+    <PrivateAssets>all</PrivateAssets>
+  </PackageReference>
+  <PackageReference Include="Meziantou.Analyzer" Version="2.0.185">
+    <PrivateAssets>all</PrivateAssets>
+  </PackageReference>
+
+  <!-- EF Core -->
+  <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.0" />
+  <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.0">
+    <PrivateAssets>all</PrivateAssets>
+  </PackageReference>
+</ItemGroup>
+```
+
+| パッケージ | 用途 |
+|------------|------|
+| SonarAnalyzer.CSharp | バグ・セキュリティ・コードスメル検出（600以上のルール） |
+| Meziantou.Analyzer | コード品質・パフォーマンス系ルール |
+| Microsoft.EntityFrameworkCore.SqlServer | EF Core SQL Server プロバイダ |
+| Microsoft.EntityFrameworkCore.Tools | マイグレーションコマンド（dotnet ef） |
+
+---
+
+## 4. Git Hook
+
+チーム全員が以下を実行します（初回のみ）。
+
+```bash
+git config core.hooksPath .githooks
+```
+
+`.githooks/pre-commit` の内容：
+
+```sh
+#!/bin/sh
+# frontend: ESLint + Prettier チェック
+cd frontend && pnpm eslint . && pnpm prettier --check . && cd ..
+
+# backend: フォーマット + 静的解析
+dotnet format --verify-no-changes
+dotnet build --no-incremental -warnaserror
+```
+
+---
+
+## 5. vite.config.ts への追記
+
+`@/` エイリアスを有効にするため `vite.config.ts` に追加します。
+
+```ts
+import path from 'path';
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+    },
+  },
+});
+```
+
+---
+
+## 6. 命名規則まとめ
+
+### TypeScript / React（ESLint で強制）
+
+| 対象 | 規則 | 例 |
+|------|------|----|
+| 変数・関数 | camelCase | `userName`, `fetchData` |
+| React コンポーネント | PascalCase | `UserCard`, `LoginForm` |
+| 定数 | UPPER_CASE | `MAX_RETRY_COUNT` |
+| boolean 変数 | is/has/should/can/will プレフィックス | `isLoading`, `hasError` |
+| 型・インターフェース・クラス | PascalCase | `UserResponse`, `ApiClient` |
+| 型パラメータ | T プレフィックス | `TItem`, `TResponse` |
+| enum メンバ | PascalCase | `Status.Active` |
+
+### C#（EditorConfig + SonarAnalyzer で強制）
+
+| 対象 | 規則 | 例 |
+|------|------|----|
+| クラス・構造体・enum | PascalCase | `UserService`, `OrderStatus` |
+| インターフェース | I プレフィックス | `IUserRepository` |
+| 型パラメータ | T プレフィックス | `TEntity`, `TResult` |
+| public メソッド・プロパティ | PascalCase | `GetById`, `UserName` |
+| const | PascalCase | `MaxRetryCount` |
+| private フィールド | _ プレフィックス + camelCase | `_userRepository` |
+| パラメータ・ローカル変数 | camelCase | `userId`, `orderList` |
+| 非同期メソッド | Async サフィックス ※StyleCop 必要 | `GetByIdAsync` |
+EOF
+
+# -----------------------------------------------------------------------------
 # 完了メッセージ
 # -----------------------------------------------------------------------------
 echo ""
@@ -665,18 +822,6 @@ echo "  frontend/.prettierrc.js"
 echo "  frontend/.prettierignore"
 echo "  frontend/tsconfig.json"
 echo "  frontend/eslint.config.js"
+echo "  SETUP.md"
 echo ""
-echo "次のステップ:"
-echo "  1. VS Code 拡張機能をインストール"
-echo "     code --install-extension EditorConfig.EditorConfig"
-echo "     code --install-extension esbenp.prettier-vscode"
-echo "     code --install-extension dbaeumer.vscode-eslint"
-echo ""
-echo "  2. frontend の依存パッケージをインストール"
-echo "     cd frontend"
-echo "     pnpm add -D prettier @trivago/prettier-plugin-sort-imports"
-echo "     pnpm add -D eslint typescript-eslint @eslint/js"
-echo "     pnpm add -D eslint-plugin-react-hooks eslint-plugin-react-refresh"
-echo ""
-echo "  3. @/ エイリアスを vite.config.ts にも追加すること"
-echo "     resolve: { alias: { '@': path.resolve(__dirname, 'src') } }"
+echo "詳細な手順は SETUP.md を参照してください。"
